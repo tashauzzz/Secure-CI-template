@@ -1,0 +1,12 @@
+exclude_dirs:
+  - '.venv'
+  - 'data'
+  - 'reports'
+  - '.run'
+  - '.git'
+  - '__pycache__'
+  - '.state'
+  - '.cache'
+  - 'logs'
+  - 'db'
+  - 'fanal'

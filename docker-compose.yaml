@@ -1,0 +1,13 @@
+services:
+  authlab:
+    build: .
+    image: authlab:baseline
+    ports:
+      - "127.0.0.1:5000:5000"
+    env_file:
+      - ${AUTHLAB_ENV_FILE:-.env}
+    environment:
+      HOST: 0.0.0.0
+      PORT: 5000
+    volumes:
+      - ./data:/app/data

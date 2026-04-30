@@ -1,0 +1,594 @@
+openapi: 3.0.3
+
+info:
+  title: AuthLab API (DEV)
+  version: "0.1.0"
+  description: >
+    Lab-only REST API for AuthLab.
+    Cookie session is the primary auth for all endpoints.
+    DEV bootstrap: POST /auth/session with Authorization: Bearer <DEV_API_KEY> (when DEV_MODE=true).
+
+servers:
+  - url: http://authlab:5000/api/v1
+    description: Docker Compose network (service name authlab)
+
+tags:
+  - name: Auth
+  - name: Guestbook
+  - name: Products
+  - name: Notes
+
+security:
+  - cookieAuth: []
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Flask session cookie (set after auth/bootstrap).
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: DEV bootstrap only (POST /auth/session).
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: unauthorized
+            message:
+              type: string
+              example: Login required
+            details:
+              nullable: true
+
+    AuthSessionCreateResponse:
+      type: object
+      required: [user, csrf_token]
+      properties:
+        user:
+          type: string
+          example: admin
+        csrf_token:
+          type: string
+          example: "7d1a0b5c...f3"
+
+    AuthSessionStatusResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          type: string
+          example: admin
+
+    GuestbookMessage:
+      type: object
+      required: [id, ts, user, message]
+      properties:
+        id:
+          type: integer
+          example: 7
+        ts:
+          type: string
+          format: date-time
+          example: "2025-10-20T12:34:56Z"
+        user:
+          type: string
+          example: admin
+        message:
+          type: string
+          example: hello from postman
+
+    GuestbookListResponse:
+      type: object
+      required: [items, count, total, offset, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuestbookMessage"
+        count:
+          type: integer
+          example: 1
+        total:
+          type: integer
+          example: 5
+        offset:
+          type: integer
+          example: 0
+        limit:
+          type: integer
+          example: 20
+
+    Product:
+      type: object
+      required: [id, name, price]
+      properties:
+        id:
+          type: integer
+          example: 3
+        name:
+          type: string
+          example: "Laptop Pro 14"
+        price:
+          type: number
+          example: 1299.0
+
+    ProductsListResponse:
+      type: object
+      required: [items, count, total, offset, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        count:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 120
+        offset:
+          type: integer
+          example: 0
+        limit:
+          type: integer
+          example: 20
+
+    NoteListItem:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Admin note #1"
+
+    NotesListResponse:
+      type: object
+      required: [items, count, total, offset, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NoteListItem"
+        count:
+          type: integer
+          example: 3
+        total:
+          type: integer
+          example: 3
+        offset:
+          type: integer
+          example: 0
+        limit:
+          type: integer
+          example: 20
+
+    NoteDetail:
+      type: object
+      required: [id, title, body]
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Admin note #1"
+        body:
+          type: string
+          example: "Seeded note 1 for admin"
+
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      description: Page size.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    OffsetParam:
+      name: offset
+      in: query
+      description: Offset into results.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 10000
+        default: 0
+
+    CsrfHeader:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Must match csrf_token returned by POST /auth/session.
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: Unauthorized (no valid session)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            error:
+              code: not_found
+              message: Resource not found
+
+    RateLimited:
+      description: Too Many Requests (rate-limited)
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+paths:
+  /auth/session:
+    post:
+      tags: [Auth]
+      summary: Create/refresh session and return CSRF token (DEV bootstrap)
+      description: >
+        If session cookie already exists, returns user + csrf_token (ensuring token exists).
+        Otherwise, in DEV_MODE you can bootstrap with Authorization: Bearer <DEV_API_KEY>.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: OK
+          headers:
+            Set-Cookie:
+              description: Flask session cookie
+              schema:
+                type: string
+            Cache-Control:
+              description: Response must not be cached.
+              schema:
+                type: string
+              example: "no-store"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionCreateResponse"
+        "401":
+          description: Unauthorized (no valid session / invalid DEV bootstrap)
+          headers:
+            Cache-Control:
+              description: Response must not be cached.
+              schema:
+                type: string
+              example: "no-store"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too Many Requests (rate-limited)
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                minimum: 1
+            Cache-Control:
+              description: Response must not be cached.
+              schema:
+                type: string
+              example: "no-store"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+    get:
+      tags: [Auth]
+      summary: Read current session status
+      description: >
+        Returns current user when session exists.
+        If user exists but csrf_token is missing, returns 409 bootstrap_required.
+      responses:
+        "200":
+          description: OK
+          headers:
+            Cache-Control:
+              description: Response must not be cached.
+              schema:
+                type: string
+              example: "no-store"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionStatusResponse"
+        "401":
+          description: Unauthorized (no valid session)
+          headers:
+            Cache-Control:
+              description: Response must not be cached.
+              schema:
+                type: string
+              example: "no-store"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Bootstrap required (csrf_token missing)
+          headers:
+            Cache-Control:
+              description: Response must not be cached.
+              schema:
+                type: string
+              example: "no-store"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                error:
+                  code: bootstrap_required
+                  message: Call POST /auth/session first
+
+  /guestbook/messages:
+    get:
+      tags: [Guestbook]
+      summary: List guestbook messages (newest first)
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestbookListResponse"
+        "400":
+          description: Bad parameters (invalid_param / invalid_range)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [Guestbook]
+      summary: Create a guestbook message
+      description: Requires X-CSRF-Token. Rate-limited.
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  description: Message text; server may truncate to MAX_MSG_LEN.
+                  example: hello from postman
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              description: URL of the created resource
+              schema:
+                type: string
+                example: "/api/v1/guestbook/messages/7"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestbookMessage"
+        "400":
+          description: Bad request (empty message / invalid CSRF / invalid JSON / invalid_param)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "415":
+          description: Unsupported Media Type (expected application/json)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                error:
+                  code: bad_json
+                  message: Expected application/json
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /guestbook/messages/{msg_id}:
+    get:
+      tags: [Guestbook]
+      summary: Get a single guestbook message by id
+      parameters:
+        - name: msg_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestbookMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List products with filters, sorting, pagination
+      description: Rate-limited. Supports Link header pagination.
+      parameters:
+        - name: q
+          in: query
+          description: Case-insensitive substring match on product name.
+          schema:
+            type: string
+            maxLength: 200
+          example: lap
+        - name: min_price
+          in: query
+          description: Minimum price (inclusive).
+          schema:
+            type: number
+          example: 1000
+        - name: max_price
+          in: query
+          description: Maximum price (inclusive).
+          schema:
+            type: number
+          example: 1500
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - name: sort_by
+          in: query
+          description: Sort field.
+          schema:
+            type: string
+            enum: [id, name, price]
+            default: name
+        - name: sort_dir
+          in: query
+          description: Sort direction.
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        "200":
+          description: OK
+          headers:
+            Link:
+              description: RFC 5988 pagination links (rel="prev", rel="next") when applicable.
+              schema:
+                type: string
+              example: </api/v1/products?limit=20&offset=20&sort_by=name&sort_dir=asc>; rel="next"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsListResponse"
+        "400":
+          description: Bad parameters (invalid_param / invalid_range / invalid_sort_by / invalid_sort_dir)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /notes:
+    get:
+      tags: [Notes]
+      summary: List current user's notes (owner-only)
+      description: Rate-limited. Supports Link header pagination.
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - name: sort_by
+          in: query
+          description: Sort field.
+          schema:
+            type: string
+            enum: [id, title]
+            default: title
+        - name: sort_dir
+          in: query
+          description: Sort direction.
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        "200":
+          description: OK
+          headers:
+            Link:
+              description: RFC 5988 pagination links (rel="prev", rel="next") when applicable.
+              schema:
+                type: string
+              example: </api/v1/notes?limit=20&offset=20&sort_by=title&sort_dir=asc>; rel="next"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotesListResponse"
+        "400":
+          description: Bad parameters (invalid_param / invalid_range / invalid_sort_by / invalid_sort_dir)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /notes/{note_id}:
+    get:
+      tags: [Notes]
+      summary: Get a single note (owner-only, masked 404)
+      description: Returns 404 for both non-existent and foreign notes. Rate-limited.
+      parameters:
+        - name: note_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
