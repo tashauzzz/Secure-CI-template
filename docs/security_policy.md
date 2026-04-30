@@ -73,11 +73,20 @@ The pipeline blocks on:
 * Trivy image **fixable CRITICAL** OS/base-image findings
 * ZAP API findings at **High** severity according to the ZAP Automation Framework plan
 
-## 4.1 Repository-level enforcement
+### 4.1 Repository-level enforcement
 
 The blocking conditions above describe CI job outcomes: a stage fails the workflow when its configured gate is violated or when required reports cannot be produced.
 
-The repository enforces these outcomes through GitHub branch protection / rulesets. The `main` branch requires the selected GitHub Actions checks to pass before merge.
+Repository-level merge enforcement is controlled through a GitHub ruleset on the default branch. The protected `main` branch requires changes to go through a pull request and requires the selected GitHub Actions checks to pass before merge.
+
+Required checks:
+
+* `Static`
+* `Image security`
+* `Runtime ZAP`
+* `Security summary`
+
+The ruleset also blocks force pushes and branch deletion for the protected branch. Scheduled drift checks, such as `Runtime nightly`, are not configured as merge-required checks.
 
 ---
 
