@@ -1,0 +1,80 @@
+env:
+  contexts:
+    - name: authlab-api
+      urls:
+        - http://authlab:5000
+
+jobs:
+  - type: script
+    parameters:
+      action: "add"
+      type: "httpsender"
+      engine: "ECMAScript : Graal.js"
+      name: "authlab-session"
+      source: "./scripts/authlab_session.js"
+
+  - type: requestor
+    requests:
+      - name: pre-auth sanity
+        url: http://authlab:5000/api/v1/auth/session
+        method: GET
+        responseCode: 401
+
+      - name: bootstrap login
+        url: http://authlab:5000/api/v1/auth/session
+        method: POST
+        headers:
+          - "Authorization: Bearer __DEV_API_KEY__"
+        responseCode: 200
+
+      - name: post-auth verify
+        url: http://authlab:5000/api/v1/auth/session
+        method: GET
+        responseCode: 200
+
+  - type: openapi
+    parameters:
+      apiFile: /zap/wrk/docs/openapi.yaml
+      targetUrl: http://authlab:5000/api/v1
+
+  - type: activeScan
+    parameters:
+      context: authlab-api
+      url: http://authlab:5000/api/v1
+
+  - type: requestor
+    requests:
+      - name: post-scan verify
+        url: http://authlab:5000/api/v1/auth/session
+        method: GET
+        responseCode: 200
+
+  - type: passiveScan-wait
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/reports
+      reportFile: zap-api.html
+      reportTitle: AuthLab ZAP API Authenticated Scan
+      reportDescription: Authenticated runtime API scan report (CI)
+      displayReport: false
+    sites:
+      - authlab:5000
+
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/reports
+      reportFile: zap-api.json
+      reportTitle: AuthLab ZAP API Authenticated Scan
+      reportDescription: Authenticated runtime API scan report (CI)
+      displayReport: false
+    sites:
+      - authlab:5000
+
+  - type: exitStatus
+    parameters:
+      errorLevel: High
+      okExitValue: 0
+      errorExitValue: 1
