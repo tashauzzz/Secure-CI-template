@@ -1,5 +1,11 @@
 FROM python:3.13-slim
 
+# Refresh OS packages during build to reduce known fixable base-layer CVEs
+# before the image is scanned by Trivy.
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Make Python output unbuffered (better logs in Docker/CI) and avoid .pyc files
