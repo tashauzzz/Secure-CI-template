@@ -64,7 +64,7 @@ Key supporting files include:
 
 - [.github/workflows/security.yaml](../.github/workflows/security.yaml) — defines GitHub Actions job orchestration, stage ordering, and artifact handoff between jobs
 - [.github/dependabot.yml](../.github/dependabot.yml) — defines automated dependency update proposals for GitHub Actions and helps keep pinned workflow components current
-- [dockerfile](../dockerfile) — defines the application image used by build, image-security, and runtime stages
+- [dockerfile](../dockerfile) — defines the application image used by build, image-security, and runtime stages; refreshes OS packages during image build to reduce known fixable base-layer vulnerabilities
 - [docker-compose.yaml](../docker-compose.yaml) — defines the container runtime used by CI-oriented container execution
 - [.env.example](../.env.example) and [.env.ci.example](../.env.ci.example) — provide profile templates used by environment bootstrap
 - [requirements.txt](../requirements.txt) and [requirements_dev.txt](../requirements_dev.txt) — define application and tooling dependency sets used by host bootstrap modes
