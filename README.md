@@ -8,7 +8,7 @@ This project is the CI/security-verification layer of the wider portfolio:
 
 * **[Project 1](https://github.com/tashauzzz/AuthLab):** application security behavior
 * **[Project 2](https://github.com/tashauzzz/Secure-CI-template):** CI security verification around the same app
-* **Project 3:** deployment hardening around the same app
+* **[Project 3](https://github.com/tashauzzz/Secure-Deploy-Lab):** container and Kubernetes deployment hardening around the same app
 
 ---
 
